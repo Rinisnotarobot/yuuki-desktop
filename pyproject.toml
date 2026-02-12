@@ -1,0 +1,18 @@
+[project]
+name = "yuuki-desktop"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "accelerate>=1.12.0",
+    "live2d-py>=0.6.1.1",
+    "mss>=10.1.0",
+    "numpy>=2.4.2",
+    "opencv-python>=4.13.0.92",
+    "pyaudio>=0.2.14",
+    "pyside6>=6.10.2",
+    "silero-vad>=6.2.0",
+    "sounddevice>=0.5.5",
+    "transformers>=5.1.0",
+]
