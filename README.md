@@ -50,7 +50,6 @@ uv sync
 | `opencv-python` | 图像预处理与帧差异比较                   |
 | `numpy`         | 音频/图像数据的数组操作                  |
 | `sounddevice`   | 音频流输入（麦克风监听）                 |
-| `pyaudio`       | 音频 I/O 支持                            |
 | `silero-vad`    | 语音活动检测模型                         |
 | `transformers`  | Hugging Face 模型加载框架                |
 | `accelerate`    | 模型推理加速                             |
@@ -215,8 +214,6 @@ yuuki-desktop/
 - `.4096/` — 纹理资源目录
 
 ---
-
-
 
 ## 许可证
 
