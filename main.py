@@ -4,11 +4,15 @@ import os
 import traceback
 
 import live2d.v3 as live2d
+from dotenv import load_dotenv
 from PySide6.QtCore import QPoint, Qt, QThread, QTimer
 from PySide6.QtGui import QGuiApplication, QMouseEvent, QSurfaceFormat
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtWidgets import QApplication, QMenu
 
+from src.agent import AgentWorker
+from src.chat_bubble import ChatBubble
+from src.controller import Controller
 from src.screen_worker import ScreenChangeDetector
 from src.transcribe_worker import TranscribeWorker
 from src.vad_worker import FullSentenceWorker
@@ -34,6 +38,9 @@ class Live2DWidget(QOpenGLWidget):
         # 拖拽相关
         self._dragging = False
         self._drag_offset = QPoint()
+
+        # 对话气泡（外部赋值）
+        self.chat_bubble: ChatBubble | None = None
 
         # 系统缩放倍率
         self._system_scale = 1
@@ -105,6 +112,11 @@ class Live2DWidget(QOpenGLWidget):
     def on_significant_screen_change(self, score, _img):
         print(f"屏幕显著变化: {score:.2f}")
 
+    def on_agent_response(self, text):
+        """收到 Agent 回复时，通过对话气泡显示。"""
+        if self.chat_bubble is not None:
+            self.chat_bubble.show_message(text)
+
     def _apply_initial_expressions(self):
         """加载模型目录下的指定表情文件，自动应用参数"""
         if not self.model:
@@ -147,6 +159,7 @@ if __name__ == "__main__":
         help="启动时自动应用的表情文件列表",
     )
     args, remaining = parser.parse_known_args()
+    load_dotenv()
 
     live2d.init()
 
@@ -159,11 +172,32 @@ if __name__ == "__main__":
     app = QApplication(remaining)
     widget = Live2DWidget(args.model, init_expressions=args.expressions)
 
+    # 创建粉色对话气泡
+    chat_bubble = ChatBubble(parent_widget=widget)
+    widget.chat_bubble = chat_bubble
+
+    # 输入控制器（主线程，Agent 忙碌时丢弃新输入）
+    controller = Controller()
+
+    # 启动 Agent 线程
+    agent_thread = QThread()
+    agent_worker = AgentWorker()
+    agent_worker.moveToThread(agent_thread)
+    # Controller -> AgentWorker（转发被接受的输入）
+    controller.text_accepted.connect(agent_worker.on_text_input)
+    controller.screen_accepted.connect(agent_worker.on_screen_change)
+    # AgentWorker -> 对话气泡 + Controller（解除忙碌）
+    agent_worker.response_ready.connect(widget.on_agent_response)
+    agent_worker.response_ready.connect(controller.on_agent_done)
+    agent_thread.start()
+
     screen_thread = QThread()
     detector = ScreenChangeDetector()
     detector.moveToThread(screen_thread)
     screen_thread.started.connect(detector.start_detecting)
     detector.significant_change_detected.connect(widget.on_significant_screen_change)
+    # 屏幕变化 -> Controller 过滤
+    detector.significant_change_detected.connect(controller.on_screen_change)
     detector.finished.connect(screen_thread.quit)
     app.aboutToQuit.connect(detector.stop_detecting)
     screen_thread.start()
@@ -182,6 +216,8 @@ if __name__ == "__main__":
     asr_worker = TranscribeWorker()
     asr_worker.moveToThread(asr_thread)
     vad_worker.sentence_ready.connect(asr_worker.on_sentence_audio)
+    # ASR 转写文本 -> Controller 过滤
+    asr_worker.transcription_ready.connect(controller.on_text_input)
     asr_thread.start()
 
     widget.show()

@@ -17,7 +17,7 @@ class ScreenChangeDetector(QObject):
         self.monitor_idx = 1
 
         # --- 参数调优 ---
-        self.check_interval = 1 / 60  # 每秒60帧
+        self.check_interval = 1 / 30  # 每秒60帧
         self.resize_width = 1280  # 压缩宽度，越小越忽略细节
         self.resize_height = 720  # 压缩高度
         self.threshold = 50  # 触发阈值：平均像素差异超过此值才算变化
@@ -63,7 +63,10 @@ class ScreenChangeDetector(QObject):
             if score > self.threshold:
                 print(f"检测到显著变化！Score: {score:.2f}")
                 self.last_trigger_time = time.time()
-                self.significant_change_detected.emit(score, original_img)
+                # 延迟 0.3s 再截取最终图像，等待画面稳定
+                QThread.msleep(300)
+                final_img, current_frame = self.get_processed_frame()
+                self.significant_change_detected.emit(score, final_img)
                 self.last_frame = current_frame
             else:
                 self.last_frame = current_frame
