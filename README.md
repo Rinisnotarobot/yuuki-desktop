@@ -31,14 +31,28 @@
 
 项目使用 [uv](https://docs.astral.sh/uv/) 管理依赖（也可以使用 pip）。
 
-1. **克隆仓库**
+1. **安装 uv**（如果尚未安装）
+
+   Windows:
+
+   ```powershell
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   ```
+
+   macOS / Linux:
+
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. **克隆仓库**
 
    ```bash
    git clone <repo-url>
    cd yuuki-desktop
    ```
 
-2. **安装依赖**
+3. **安装依赖**
 
    ```bash
    uv sync
@@ -46,7 +60,7 @@
    pip install -r requirements.txt
    ```
 
-3. **配置环境变量**
+4. **配置环境变量**
    项目需要 Google Gemini API Key 才能运行核心 AI 功能。
 
    复制配置文件模板：
