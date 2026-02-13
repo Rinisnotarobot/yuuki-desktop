@@ -128,3 +128,21 @@ yuuki-desktop/
 - **AI Agent**: Agno framework + Google Gemini
 - **Vision**: OpenCV + MSS
 - **Audio**: Silero VAD + GLM-ASR + SoundDevice
+
+---
+
+## 📄 开源协议
+
+本项目采用 [MIT 许可证](LICENSE) 开源。
+
+你可以自由地：
+
+- **使用**：用于个人或商业项目。
+- **修改**：根据需要修改代码。
+- **分发**：复制并分享本项目。
+
+惟需遵守以下条件：
+
+- 在副本或修改版中包含原作者的版权声明和许可声明。
+
+> **注意**：本项目中引用的 Live2D 模型资源可能受其原始作者的版权限制，不包含在 MIT 协议授权范围内。请在使用相关模型前确认其授权条款。
