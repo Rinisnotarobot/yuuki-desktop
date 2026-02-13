@@ -1,12 +1,15 @@
 """粉色对话气泡窗口，用于显示 Agent 的回复文本。"""
 
-from PySide6.QtCore import QPropertyAnimation, Qt, QTimer, Slot
+from PySide6.QtCore import QPropertyAnimation, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath
 from PySide6.QtWidgets import QLabel, QWidget
 
 
 class ChatBubble(QWidget):
     """无边框粉色圆角对话气泡，自动跟随父窗口定位并在若干秒后淡出。"""
+
+    # 气泡完全消失后发射
+    dismissed = Signal()
 
     # 样式常量
     BG_COLOR = QColor(255, 182, 193, 230)  # 粉色半透明
@@ -131,5 +134,10 @@ class ChatBubble(QWidget):
         self._fade_anim.setDuration(600)
         self._fade_anim.setStartValue(1.0)
         self._fade_anim.setEndValue(0.0)
-        self._fade_anim.finished.connect(self.hide)
+        self._fade_anim.finished.connect(self._on_fade_finished)
         self._fade_anim.start()
+
+    def _on_fade_finished(self):
+        """淡出完成后隐藏并发射 dismissed 信号。"""
+        self.hide()
+        self.dismissed.emit()

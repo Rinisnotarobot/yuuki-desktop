@@ -6,7 +6,7 @@ import traceback
 import live2d.v3 as live2d
 from dotenv import load_dotenv
 from OpenGL.GL import glViewport
-from PySide6.QtCore import QPoint, Qt, QThread, QTimerEvent
+from PySide6.QtCore import QPoint, Qt, QThread, QTimerEvent, Signal, Slot
 from PySide6.QtGui import QGuiApplication, QMouseEvent, QSurfaceFormat
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtWidgets import QApplication, QMenu
@@ -20,6 +20,9 @@ from src.vad_worker import FullSentenceWorker
 
 
 class Live2DWidget(QOpenGLWidget):
+    # 模型加载完成后发射，携带 expression_ids(list) 和 motion_groups(dict)
+    model_info_ready = Signal(list, dict)
+
     def __init__(self, model_path, init_expressions=None):
         super().__init__()
         self.model_path = model_path
@@ -63,8 +66,13 @@ class Live2DWidget(QOpenGLWidget):
             # 自动加载初始表情（如水印关闭）
             self._apply_initial_expressions()
 
-            # 60fps 定时器
-            self.startTimer(int(1000 / 120))
+            # 发射模型可用表情 & 动作给 Agent
+            expr_ids = self.model.GetExpressionIds()
+            motion_groups = self.model.GetMotionGroups()
+            self.model_info_ready.emit(expr_ids, motion_groups)
+
+            # 30fps 定时器 (降低刷新率以减少资源占用和可能的闪烁)
+            self.startTimer(int(1000 / 60))
 
         except Exception:
             traceback.print_exc()
@@ -122,6 +130,29 @@ class Live2DWidget(QOpenGLWidget):
         action = menu.exec(event.globalPos())
         if action == quit_action:
             QApplication.quit()
+
+    # ── Agent 触发的模型控制槽 ──
+
+    @Slot(str)
+    def on_set_expression(self, expression_id: str):
+        """Agent 请求切换表情。"""
+        if self.model:
+            self.model.SetExpression(expression_id)
+            print(f"[Live2D] 切换表情: {expression_id}")
+
+    @Slot(str, int)
+    def on_start_motion(self, group: str, index: int):
+        """Agent 请求播放动作。"""
+        if self.model:
+            self.model.StartMotion(group, index, 3)  # priority=3 (Force)
+            print(f"[Live2D] 播放动作: {group}[{index}]")
+
+    @Slot()
+    def on_bubble_dismissed(self):
+        """对话气泡消失后，重置表情到默认状态。"""
+        if self.model:
+            self.model.ResetExpressions()
+            print("[Live2D] 气泡消失，表情已重置")
 
     def on_significant_screen_change(self, score, _img):
         print(f"屏幕显著变化: {score:.2f}")
@@ -188,6 +219,7 @@ if __name__ == "__main__":
 
     # 创建粉色对话气泡
     chat_bubble = ChatBubble(parent_widget=widget)
+    chat_bubble.dismissed.connect(widget.on_bubble_dismissed)
     widget.chat_bubble = chat_bubble
 
     # 输入控制器（主线程，Agent 忙碌时丢弃新输入）
@@ -203,6 +235,11 @@ if __name__ == "__main__":
     # AgentWorker -> 对话气泡 + Controller（解除忙碌）
     agent_worker.response_ready.connect(widget.on_agent_response)
     agent_worker.response_ready.connect(controller.on_agent_done)
+    # Widget 模型加载完成 -> AgentWorker 接收表情/动作信息
+    widget.model_info_ready.connect(agent_worker.on_model_info)
+    # AgentWorker 工具调用 -> Widget 执行表情/动作
+    agent_worker.expression_requested.connect(widget.on_set_expression)
+    agent_worker.motion_requested.connect(widget.on_start_motion)
     agent_thread.start()
 
     screen_thread = QThread()
