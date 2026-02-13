@@ -5,7 +5,8 @@ import traceback
 
 import live2d.v3 as live2d
 from dotenv import load_dotenv
-from PySide6.QtCore import QPoint, Qt, QThread, QTimer
+from OpenGL.GL import glViewport
+from PySide6.QtCore import QPoint, Qt, QThread, QTimerEvent
 from PySide6.QtGui import QGuiApplication, QMouseEvent, QSurfaceFormat
 from PySide6.QtOpenGLWidgets import QOpenGLWidget
 from PySide6.QtWidgets import QApplication, QMenu
@@ -22,7 +23,7 @@ class Live2DWidget(QOpenGLWidget):
     def __init__(self, model_path, init_expressions=None):
         super().__init__()
         self.model_path = model_path
-        self.model = None
+        self.model: live2d.LAppModel | None = None
         self.init_expressions = init_expressions or ["水印关闭.exp3.json"]
 
         # 无边框 + 置顶 + 透明背景 + 工具窗口（不在任务栏显示）
@@ -32,6 +33,8 @@ class Live2DWidget(QOpenGLWidget):
             | Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        # 开启鼠标追踪，使得不按键也能触发 mouseMoveEvent
+        self.setMouseTracking(True)
 
         self.resize(1280, 720)
 
@@ -61,16 +64,14 @@ class Live2DWidget(QOpenGLWidget):
             self._apply_initial_expressions()
 
             # 60fps 定时器
-            self.timer = QTimer(self)
-            self.timer.timeout.connect(self.update)
-            self.timer.start(16)
+            self.startTimer(int(1000 / 120))
 
         except Exception:
             traceback.print_exc()
 
-    def resizeGL(self, w, h):
-        if self.model:
-            self.model.Resize(w, h)
+    def resizeGL(self, w: int, h: int) -> None:
+        glViewport(0, 0, w, h)
+        self.model.Resize(w, h)  # type: ignore
 
     def paintGL(self):
         try:
@@ -81,6 +82,9 @@ class Live2DWidget(QOpenGLWidget):
                 self.model.Draw()
         except Exception:
             traceback.print_exc()
+
+    def timerEvent(self, a0: QTimerEvent | None) -> None:
+        self.update()
 
     # ── 鼠标拖拽移动窗口 ──
 
@@ -93,7 +97,17 @@ class Live2DWidget(QOpenGLWidget):
     def mouseMoveEvent(self, event: QMouseEvent):
         if self._dragging:
             self.move(event.globalPosition().toPoint() - self._drag_offset)
-        super().mouseMoveEvent(event)
+        else:
+            x, y = (
+                event.globalPosition().x() - self.x(),
+                event.globalPosition().y() - self.y(),
+            )
+            # 缩小鼠标跟踪幅度（0.1倍），避免视线移动过大
+            cx, cy = self.width() / 2, self.height() / 2
+            x = cx + (x - cx) * 0.3
+            y = cy + (y - cy) * 0.3
+
+            self.model.Drag(x, y)  # type: ignore
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:

@@ -15,10 +15,27 @@ class TranscribeWorker(QObject):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         repo_id = "zai-org/GLM-ASR-Nano-2512"
-        self.processor = AutoProcessor.from_pretrained(repo_id)
-        self.model = AutoModel.from_pretrained(
-            repo_id, dtype=torch.bfloat16, device_map=self.device
-        )
+        try:
+            # 优先尝试加载本地缓存，避免每次都联网检查导致警告
+            print("[ASR] 尝试加载本地缓存模型...")
+            self.processor = AutoProcessor.from_pretrained(
+                repo_id, local_files_only=True
+            )
+            self.model = AutoModel.from_pretrained(
+                repo_id,
+                dtype=torch.bfloat16,
+                device_map=self.device,
+                local_files_only=True,
+            )
+            print("[ASR] 本地模型加载成功")
+        except Exception:
+            # 本地没有缓存时，联网下载
+            print("[ASR] 本地无缓存，开始联网下载模型（这可能需要一些时间）...")
+            self.processor = AutoProcessor.from_pretrained(repo_id)
+            self.model = AutoModel.from_pretrained(
+                repo_id, dtype=torch.bfloat16, device_map=self.device
+            )
+            print("[ASR] 模型下载并加载成功")
 
     @Slot(np.ndarray)
     def on_sentence_audio(self, audio_data: np.ndarray):
