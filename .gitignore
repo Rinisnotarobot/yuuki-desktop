@@ -8,6 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
-resources/狐狸学姐
-resources/girlfriend
+resources
+
 .env
